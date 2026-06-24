@@ -1,0 +1,38 @@
+CMake build directories
+
+build/
+bin/
+out/
+
+Compiled Object files
+
+*.o
+*.obj
+
+Compiled Dynamic libraries
+
+*.so
+*.dylib
+*.dll
+
+Compiled Static libraries
+
+*.lai
+*.la
+*.a
+*.lib
+
+Executables
+
+*.exe
+*.out
+*.app
+thread_scheduler_vm
+
+IDE and OS specific files
+
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.user
