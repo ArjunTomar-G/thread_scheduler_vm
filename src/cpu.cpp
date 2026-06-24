@@ -1,26 +1,63 @@
-#include "../include/memory.h"
-Memory::Memory(size_t size) {
-    ram.resize(size, 0); // Fill RAM with 0s
+#include "../include/cpu.h"
+#include <iostream>
+// Opcodes for our tiny VM
+const uint8_t OP_LOAD  = 0x01;
+const uint8_t OP_ADD   = 0x02;
+const uint8_t OP_PRINT = 0x03;
+const uint8_t OP_HALT  = 0xFF;
+CPU::CPU(Memory& mem) : memory(mem), pc(0), is_running(false) { reset(); }
+void CPU::reset() {
+    pc = 0;
+    registers.fill(0);
+    is_running = true;
 }
-uint8_t Memory::read(size_t address) const {
-    if (address < ram.size()) {
-        return ram[address];
+bool CPU::running() const {
+    return is_running;
+}
+void CPU::step() {
+    if (!is_running) return;
+    // 1. FETCH the instruction (Opcode)
+    uint8_t opcode = memory.read(pc);
+    pc++; 
+    // 2. DECODE and EXECUTE
+    switch (opcode) {
+        case OP_LOAD: {
+            // LOAD format: [OP_LOAD] [Reg Index] [Value]
+            uint8_t reg = memory.read(pc++);
+            uint8_t val = memory.read(pc++);
+            registers[reg] = val;
+            break;
+        }
+        case OP_ADD: {
+            // ADD format: [OP_ADD] [Dest Reg] [Src Reg 1] [Src Reg 2]
+            uint8_t dest_reg = memory.read(pc++);
+            uint8_t src_reg1 = memory.read(pc++);
+            uint8_t src_reg2 = memory.read(pc++);
+            registers[dest_reg] = registers[src_reg1] + registers[src_reg2];
+            break;
+        }
+        case OP_PRINT: {
+            // PRINT format: [OP_PRINT] [Reg Index]
+            uint8_t reg = memory.read(pc++);
+            std::cout << "VM Output -> R" << (int)reg << " = " << registers[reg] << "\n";
+            break;
+        }
+        case OP_HALT: {
+            // HALT format: [OP_HALT]
+            is_running = false;
+            std::cout << "CPU Halted.\n";
+            break;
+        }
+        default: {
+            std::cerr << "Unknown Opcode: 0x" << std::hex << (int)opcode << " at PC: " << (pc - 1) << "\n";
+            is_running = false;
+            break;
+        }
     }
-    std::cerr << "Memory Read Error: Out of bounds at address " << address << std::endl;
-    return 0;
 }
 
-void Memory::write(size_t address, uint8_t value) {
-    if (address < ram.size()) {
-        ram[address] = value;
-    } else {
-        std::cerr << "Memory Write Error: Out of bounds at address " << address << std::endl;
-    }
-}
-void Memory::load_program(const std::vector<uint8_t>& program, size_t start_address) {
-    for (size_t i = 0; i < program.size(); ++i) {
-        if (start_address + i < ram.size()) {
-            ram[start_address + i] = program[i];
-        }
+void CPU::run() {
+    while (is_running) {
+        step();
     }
 }
