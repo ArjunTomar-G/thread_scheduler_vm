@@ -1,27 +1,12 @@
-<<<<<<< HEAD
 #include "scheduler.h"
 #include <iostream>
+#include "../include/memory.h"
+#include "../include/cpu.h"
+#include <vector>
 
 int main() {
     std::cout << "Starting VM Scheduler Test...\n";
     Scheduler sched;
-    
-    sched.create_thread(0x1000); // Fake thread 1
-    sched.create_thread(0x2000); // Fake thread 2
-    
-    // Simulate context switching
-    sched.schedule_next();
-    sched.schedule_next();
-    sched.schedule_next();
-    
-    return 0;
-}
-=======
-#include "../include/memory.h"
-#include "../include/cpu.h"
-#include <vector>
-#include <iostream>
-int main() {
     std::cout << "--- Starting Phase 1 VM Test ---\n";
     // 1. Initialize our simulated hardware
     Memory ram;
@@ -42,4 +27,4 @@ int main() {
     std::cout << "--- Test Complete ---\n";
     return 0;
 }
->>>>>>> origin/tea83
+
