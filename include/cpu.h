@@ -15,5 +15,9 @@ public:
     void step();          // Fetch, Decode, and Execute ONE instruction
     void run();           // Run continuously until HALT
     bool running() const; // Check if CPU is still running
+    void set_pc(size_t new_pc);
+    size_t get_pc() const;
+    void set_registers(const uint32_t* regs);
+    void get_registers(uint32_t* regs) const;
 };
 #endif // CPU_H

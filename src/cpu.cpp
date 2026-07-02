@@ -56,6 +56,26 @@ void CPU::step() {
     }
 }
 
+void CPU::set_pc(size_t new_pc) {
+    pc = new_pc;
+}
+
+size_t CPU::get_pc() const {
+    return pc;
+}
+
+void CPU::set_registers(const uint32_t* regs) {
+    for (int i = 0; i < 4; i++) {
+        registers[i] = regs[i];
+    }
+}
+
+void CPU::get_registers(uint32_t* regs) const {
+    for (int i = 0; i < 4; i++) {
+        regs[i] = registers[i];
+    }
+}
+
 void CPU::run() {
     while (is_running) {
         step();
