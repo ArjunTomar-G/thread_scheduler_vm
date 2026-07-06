@@ -23,8 +23,7 @@ set(SOURCES
 # Create the executable named "thread_scheduler_vm" using the source files
 add_executable(thread_scheduler_vm ${SOURCES})
 
-# Note for Phase 4: When you are ready to build the visualizer, 
-# uncomment the lines below to link the ncurses library.
-# find_package(Curses REQUIRED)
-# include_directories(${CURSES_INCLUDE_DIR})
-# target_link_libraries(thread_scheduler_vm ${CURSES_LIBRARIES})
+# visualizer 
+find_package(Curses REQUIRED)
+include_directories(${CURSES_INCLUDE_DIR})
+target_link_libraries(thread_scheduler_vm ${CURSES_LIBRARIES})
