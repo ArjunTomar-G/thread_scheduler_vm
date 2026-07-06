@@ -1,10 +1,5 @@
 #include "../include/cpu.h"
 #include <iostream>
-// Opcodes for our tiny VM
-const uint8_t OP_LOAD  = 0x01;
-const uint8_t OP_ADD   = 0x02;
-const uint8_t OP_PRINT = 0x03;
-const uint8_t OP_HALT  = 0xFF;
 CPU::CPU(Memory& mem) : memory(mem), pc(0), is_running(false) { reset(); }
 void CPU::reset() {
     pc = 0;
@@ -46,6 +41,26 @@ void CPU::step() {
             // HALT format: [OP_HALT]
             is_running = false;
             std::cout << "CPU Halted.\n";
+            break;
+        }
+        case OP_SUB: {
+            // SUB format: [OP_SUB] [Dest Reg] [Src Reg 1] [Src Reg 2]
+            uint8_t dest_reg = memory.read(pc++);
+            uint8_t src_reg1 = memory.read(pc++);
+            uint8_t src_reg2 = memory.read(pc++);
+            registers[dest_reg] = registers[src_reg1] - registers[src_reg2];
+            break;
+        }
+        case OP_JNZ: {
+            // JNZ format: [OP_JNZ] [Reg to check] [Addr High Byte] [Addr Low Byte]
+            uint8_t reg = memory.read(pc++);
+            uint8_t addr_high = memory.read(pc++);
+            uint8_t addr_low = memory.read(pc++);
+            uint16_t jump_addr = (addr_high << 8) | addr_low;
+            
+            if (registers[reg] != 0) {
+                pc = jump_addr; // Jump to the target address
+            }
             break;
         }
         default: {
