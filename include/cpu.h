@@ -3,6 +3,12 @@
 #include "memory.h"
 #include <array>
 #include <cstdint>
+constexpr uint8_t OP_LOAD  = 0x01;
+constexpr uint8_t OP_ADD   = 0x02;
+constexpr uint8_t OP_PRINT = 0x03;
+constexpr uint8_t OP_SUB   = 0x04;
+constexpr uint8_t OP_JNZ   = 0x05;
+constexpr uint8_t OP_HALT  = 0xFF;
 class CPU {
 private:
     Memory& memory;
