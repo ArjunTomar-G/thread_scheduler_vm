@@ -6,12 +6,10 @@
 int main() {
     std::cout << "Starting Thread Scheduler VM \n";
 
-    // 1. Initialize Hardware and OS
     Memory memory(10000);       
     CPU cpu(memory);     
     Scheduler scheduler; 
 
-    // 2. Define the Programs (Teammate B's code goes here)
     // Program A: Counts down from 5
     std::vector<uint8_t> programA = {
         OP_LOAD, 0, 5,         // 0x1000: Load 5 into R0
