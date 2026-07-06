@@ -7,13 +7,39 @@ int main() {
     std::cout << "Starting Thread Scheduler VM \n";
 
     // 1. Initialize Hardware and OS
-    Memory memory;       
-    CPU cpu(memory);     // Pass memory by reference to the CPU
+    Memory memory(10000);       
+    CPU cpu(memory);     
     Scheduler scheduler; 
 
-    // 2. Load fake programs into memory
+    // 2. Define the Programs (Teammate B's code goes here)
+    // Program A: Counts down from 5
+    std::vector<uint8_t> programA = {
+        OP_LOAD, 0, 5,         // 0x1000: Load 5 into R0
+        OP_LOAD, 1, 1,         // 0x1003: Load 1 into R1
+        OP_PRINT, 0,           // 0x1006: Print R0
+        OP_SUB, 0, 0, 1,       // 0x1008: R0 = R0 - R1
+        OP_JNZ, 0, 0x10, 0x06, // 0x100C: If R0 != 0, jump to 0x1006
+        OP_HALT                // 0x1010: Halt
+    };
+
+    // Program B: Counts down from 8 (Starts at address 0x2000)
+    std::vector<uint8_t> programB = {
+        OP_LOAD, 0, 8,         // 0x2000: Load 8 into R0
+        OP_LOAD, 1, 1,         // 0x2003: Load 1 into R1
+        OP_PRINT, 0,           // 0x2006: Print R0
+        OP_SUB, 0, 0, 1,       // 0x2008: R0 = R0 - R1
+        OP_JNZ, 0, 0x20, 0x06, // 0x200C: If R0 != 0, jump to 0x2006
+        OP_HALT                // 0x2010: Halt
+    };
+
+    // loading programs in memory:
+    memory.load_program(programA, 0x1000);
+    memory.load_program(programB, 0x2000);
+
+    // thread creation:
     scheduler.create_thread(0x1000);
     scheduler.create_thread(0x2000);
+
 
     // 3. Start the first thread
     TCB* current_thread = scheduler.schedule_next();
