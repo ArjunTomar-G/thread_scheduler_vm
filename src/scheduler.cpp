@@ -5,7 +5,9 @@ Scheduler::Scheduler() {
     current_thread = nullptr;
     next_thread_id = 1;
     cycle_counter = 0;
-    mlfq.resize(NUM_PRIORITIES); 
+    mlfq.resize(NUM_PRIORITIES);
+    // NEW: Initialize bump allocator to top of memory
+    next_free_stack = 19999;
 }
 
 int Scheduler::create_thread(uint32_t start_address) {
@@ -18,6 +20,9 @@ int Scheduler::create_thread(uint32_t start_address) {
     
     new_thread->context.instruction_pointer = start_address;
     new_thread->context.stack_pointer = 0; 
+    // NEW: Dynamically allocate a 1KB stack frame safely
+    new_thread->context.stack_pointer = next_free_stack;
+    next_free_stack -= 1024;
     for (int i = 0; i < 4; i++) {
         new_thread->context.registers[i] = 0;
     }
@@ -29,6 +34,15 @@ int Scheduler::create_thread(uint32_t start_address) {
     
     std::cout << "[Scheduler] Created Thread ID " << thread_ptr->thread_id << " starting at address " << start_address << "\n";
     return thread_ptr->thread_id;
+}
+
+// NEW: Proper Thread Termination
+void Scheduler::terminate_current_thread() {
+    if (current_thread != nullptr) {
+        current_thread->state = ThreadState::TERMINATED;
+        std::cout << "[Scheduler] Thread " << current_thread->thread_id << " TERMINATED.\n";
+        current_thread = nullptr; // Removes it from active context
+    }
 }
 
 TCB* Scheduler::schedule_next() {

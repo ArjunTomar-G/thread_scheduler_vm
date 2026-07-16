@@ -1,34 +1,29 @@
 #include "../include/cpu.h"
-#include "../include/scheduler.h"
 #include <iostream>
 
-CPU::CPU(Memory& mem) : memory(mem), pc(0), is_running(false), cycle_count(0), time_quantum(8), timer_interrupt_flag(false) { 
+CPU::CPU(Memory& mem) : memory(mem), pc(0), is_running(false), cycle_count(0), time_quantum(8), timer_interrupt_flag(false), soft_interrupt(SoftwareInterrupt::NONE), soft_interrupt_arg(0) { 
     reset(); 
 }
 
 void CPU::reset() {
     pc = 0;
-    // Set SP to the top of our 20,000 byte memory
     sp = 19999; 
     registers.fill(0);
     is_running = true;
     cycle_count = 0;
     timer_interrupt_flag = false;
+    soft_interrupt = SoftwareInterrupt::NONE;
 }
 
-bool CPU::running() const {
-    return is_running;
-}
+bool CPU::running() const { return is_running; }
 
 void CPU::step() {
     if (!is_running) return;
     
-    // 1. FETCH the instruction (Opcode)
-    uint8_t opcode = memory.read(pc);
-    pc++; 
+    uint8_t opcode = memory.read(pc++);
     
-    // 2. DECODE and EXECUTE
     switch (opcode) {
+        /* ... Keep OP_LOAD, OP_ADD, OP_PRINT, OP_SUB, OP_JNZ, OP_PUSH, OP_POP exactly as they are ... */
         case OP_LOAD: {
             uint8_t reg = memory.read(pc++);
             uint8_t val = memory.read(pc++);
@@ -47,11 +42,6 @@ void CPU::step() {
             std::cout << "VM Output -> R" << (int)reg << " = " << registers[reg] << "\n";
             break;
         }
-        case OP_HALT: {
-            is_running = false;
-            std::cout << "CPU Halted.\n";
-            break;
-        }
         case OP_SUB: {
             uint8_t dest_reg = memory.read(pc++);
             uint8_t src_reg1 = memory.read(pc++);
@@ -64,41 +54,35 @@ void CPU::step() {
             uint8_t addr_high = memory.read(pc++);
             uint8_t addr_low = memory.read(pc++);
             uint16_t jump_addr = (addr_high << 8) | addr_low;
-            
-            if (registers[reg] != 0) {
-                pc = jump_addr; 
-            }
+            if (registers[reg] != 0) pc = jump_addr; 
             break;
         }
-        // --- NEW OPCODES FOR TASK 3 ---
         case OP_PUSH: {
             uint8_t reg = memory.read(pc++);
-            sp--; // Stack grows downwards
+            sp--; 
             memory.write(sp, (uint8_t)registers[reg]); 
             break;
         }
         case OP_POP: {
             uint8_t reg = memory.read(pc++);
             registers[reg] = memory.read(sp);
-            sp++; // Move pointer back up
+            sp++; 
+            break;
+        }
+
+        // --- NEW: Throw Software Interrupts instead of modifying state/OS directly ---
+        case OP_HALT: {
+            soft_interrupt = SoftwareInterrupt::HALT;
             break;
         }
         case OP_LOCK: {
-            uint8_t mutex_id = memory.read(pc++);
-            if (os != nullptr) {
-                if (!os->lock_mutex(mutex_id)) {
-                    // Failed to get lock. Thread is BLOCKED. 
-                    // Force a hardware context switch immediately!
-                    timer_interrupt_flag = true;
-                }
-            }
+            soft_interrupt_arg = memory.read(pc++);
+            soft_interrupt = SoftwareInterrupt::LOCK;
             break;
         }
         case OP_UNLOCK: {
-            uint8_t mutex_id = memory.read(pc++);
-            if (os != nullptr) {
-                os->unlock_mutex(mutex_id);
-            }
+            soft_interrupt_arg = memory.read(pc++);
+            soft_interrupt = SoftwareInterrupt::UNLOCK;
             break;
         }
         default: {
@@ -110,7 +94,9 @@ void CPU::step() {
 }
 
 void CPU::tick() {
-    if (!is_running) return;
+    // NEW: Stop ticking if a software interrupt is pending!
+    if (!is_running || has_software_interrupt()) return;
+    
     step();
     cycle_count++;
     if (cycle_count >= time_quantum) {
@@ -118,50 +104,24 @@ void CPU::tick() {
     }
 }
 
-void CPU::set_time_quantum(int cycles) { 
-    time_quantum = cycles; 
+// --- NEW: Interrupt getters/setters ---
+bool CPU::has_software_interrupt() const { return soft_interrupt != SoftwareInterrupt::NONE; }
+SoftwareInterrupt CPU::get_software_interrupt() const { return soft_interrupt; }
+uint8_t CPU::get_software_interrupt_arg() const { return soft_interrupt_arg; }
+
+void CPU::clear_software_interrupt() { 
+    soft_interrupt = SoftwareInterrupt::NONE; 
+    soft_interrupt_arg = 0; 
 }
 
-bool CPU::has_interrupt() const { 
-    return timer_interrupt_flag; 
-}
-
-void CPU::clear_interrupt() { 
-    timer_interrupt_flag = false; 
-    cycle_count = 0; 
-}
-
-void CPU::set_pc(size_t new_pc) {
-    pc = new_pc;
-}
-
-size_t CPU::get_pc() const {
-    return pc;
-}
-
-// --- NEW GETTERS/SETTERS FOR TASK 3 ---
-void CPU::set_sp(size_t new_sp) {
-    sp = new_sp;
-}
-
-size_t CPU::get_sp() const {
-    return sp;
-}
-
-void CPU::set_registers(const uint32_t* regs) {
-    for (int i = 0; i < 4; i++) {
-        registers[i] = regs[i];
-    }
-}
-
-void CPU::get_registers(uint32_t* regs) const {
-    for (int i = 0; i < 4; i++) {
-        regs[i] = registers[i];
-    }
-}
-
-void CPU::run() {
-    while (is_running) {
-        step();
-    }
-}
+/* ... Keep all other standard getters/setters (get_pc, set_pc, get_sp, etc.) exactly as they were ... */
+void CPU::set_time_quantum(int cycles) { time_quantum = cycles; }
+bool CPU::has_interrupt() const { return timer_interrupt_flag; }
+void CPU::clear_interrupt() { timer_interrupt_flag = false; cycle_count = 0; }
+void CPU::set_pc(size_t new_pc) { pc = new_pc; }
+size_t CPU::get_pc() const { return pc; }
+void CPU::set_sp(size_t new_sp) { sp = new_sp; }
+size_t CPU::get_sp() const { return sp; }
+void CPU::set_registers(const uint32_t* regs) { for (int i = 0; i < 4; i++) registers[i] = regs[i]; }
+void CPU::get_registers(uint32_t* regs) const { for (int i = 0; i < 4; i++) regs[i] = registers[i]; }
+void CPU::run() { while (is_running) { step(); } }

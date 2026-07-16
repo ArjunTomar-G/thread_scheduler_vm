@@ -40,7 +40,6 @@ struct Mutex {
 
 class Scheduler {
 private:
-    // NEW: Multi-Level Feedback Queue (Replaces ready_queue)
     static const int NUM_PRIORITIES = 3;
     std::vector<std::queue<TCB*>> mlfq;
     
@@ -48,9 +47,11 @@ private:
     TCB* current_thread;
     int next_thread_id;
 
-    // NEW: Mutex Registry & Cycle Tracking
     std::unordered_map<int, Mutex> mutexes;
     int cycle_counter;
+
+    // NEW: Bump Allocator for Thread Stacks
+    uint32_t next_free_stack;
 
 public:
     Scheduler();
@@ -60,10 +61,10 @@ public:
     TCB* schedule_next();
     TCB* get_current_thread();
 
-    // NEW: Mutex API
+    // NEW: Terminate API
+    void terminate_current_thread();
+
     bool lock_mutex(int mutex_id);
     void unlock_mutex(int mutex_id);
-
-    // NEW: Starvation Prevention
     void boost_priorities();
 };

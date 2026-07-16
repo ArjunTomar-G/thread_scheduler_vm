@@ -6,6 +6,7 @@
 #include <chrono>   
 #include <fstream>  
 #include <string>
+#include <iostream>
 
 // High-res timer for the flame graph (Microseconds)
 long long get_time_us() {
@@ -19,7 +20,10 @@ int main() {
     Memory memory(20000);       
     CPU cpu(memory);     
     Scheduler scheduler; 
-    cpu.attach_os(&scheduler);
+    
+    // NOTE: cpu.attach_os() has been REMOVED. 
+    // The CPU is now truly decoupled and communicates via Software Interrupts.
+
     // 2 & 3. Dynamically Generate, Patch, and Load 15 Threads
     const int NUM_THREADS = 15;
     
@@ -74,34 +78,49 @@ int main() {
         // PROFILE: Context Switch (Load)
         long long switch_start = get_time_us();
         
+        // --- 1. CONTEXT LOAD ---
+        // The CPU now trusts the OS bump allocator for the Stack Pointer
         cpu.set_pc(current_thread->context.instruction_pointer);
-        
-        // --- NEW: Load the Stack Pointer safely ---
-        if (current_thread->context.stack_pointer == 0) {
-            // Allocate a unique 1KB stack frame based on thread_id
-            cpu.set_sp(19999 - (current_thread->thread_id * 1000));
-        } else {
-            cpu.set_sp(current_thread->context.stack_pointer);
-        }
-
+        cpu.set_sp(current_thread->context.stack_pointer);
         cpu.set_registers(current_thread->context.registers);
+        
         long long switch_end = get_time_us();
         log_event("Context Switch (Load)", switch_start, switch_end, 0); 
 
         // PROFILE: Thread Execution
         long long exec_start = get_time_us();
         
-        // The CPU runs until IT throws a hardware interrupt!
-        while (!cpu.has_interrupt() && cpu.running()) {
+        // --- 2. EXECUTION ---
+        // The CPU runs until a Timer OR a Software Interrupt (Syscall) hits
+        while (!cpu.has_interrupt() && !cpu.has_software_interrupt() && cpu.running()) {
             cpu.tick(); // Advance the CPU clock
             viz.update(cpu, scheduler); 
-            
             current_thread->total_execution_time++;
         }
         
-        // OS explicitly acknowledges and clears the hardware interrupt
+        // --- 3. HARDWARE INTERRUPT HANDLING ---
         if (cpu.has_interrupt()) {
             cpu.clear_interrupt();
+        }
+
+        // --- 4. SOFTWARE INTERRUPT (SYSCALL) HANDLING ---
+        bool thread_terminated = false;
+        
+        if (cpu.has_software_interrupt()) {
+            auto reason = cpu.get_software_interrupt();
+            uint8_t arg = cpu.get_software_interrupt_arg();
+            cpu.clear_software_interrupt();
+
+            if (reason == SoftwareInterrupt::HALT) {
+                scheduler.terminate_current_thread();
+                thread_terminated = true;
+            } 
+            else if (reason == SoftwareInterrupt::LOCK) {
+                scheduler.lock_mutex(arg); // Thread goes BLOCKED if failed
+            } 
+            else if (reason == SoftwareInterrupt::UNLOCK) {
+                scheduler.unlock_mutex(arg);
+            }
         }
 
         if (!cpu.running()) { 
@@ -110,15 +129,20 @@ int main() {
         }
         
         long long exec_end = get_time_us();
-        log_event("Execute Thread " + std::to_string(current_thread->thread_id), exec_start, exec_end, current_thread->thread_id);
+        log_event("Execute Thread " + std::to_string(current_thread ? current_thread->thread_id : 0), 
+                  exec_start, exec_end, 
+                  current_thread ? current_thread->thread_id : 0);
 
         // PROFILE: Context Switch (Save & Yield)
         long long save_start = get_time_us();
         
-        current_thread->context.instruction_pointer = cpu.get_pc();
-        // --- NEW: Save the Stack Pointer back to the TCB ---
-        current_thread->context.stack_pointer = cpu.get_sp();
-        cpu.get_registers(current_thread->context.registers);
+        // --- 5. CONTEXT SAVE ---
+        // ONLY save the context back if the thread is still alive
+        if (!thread_terminated && current_thread != nullptr) {
+            current_thread->context.instruction_pointer = cpu.get_pc();
+            current_thread->context.stack_pointer = cpu.get_sp();
+            cpu.get_registers(current_thread->context.registers);
+        }
         
         current_thread = scheduler.schedule_next();
         long long save_end = get_time_us();
@@ -127,6 +151,12 @@ int main() {
         // Safety limit extended to 500 for the 15-thread horde
         if (current_thread != nullptr && current_thread->total_execution_time > 500) {
             vm_running = false; 
+        }
+        
+        // Clean exit when all threads have halted
+        if (current_thread == nullptr) {
+            std::cout << "All threads terminated or deadlocked. Shutting down VM.\n";
+            vm_running = false;
         }
     }
 
