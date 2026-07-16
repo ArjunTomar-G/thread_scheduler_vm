@@ -1,4 +1,5 @@
 #include "../include/cpu.h"
+#include "../include/scheduler.h"
 #include <iostream>
 
 CPU::CPU(Memory& mem) : memory(mem), pc(0), is_running(false), cycle_count(0), time_quantum(8), timer_interrupt_flag(false) { 
@@ -80,6 +81,24 @@ void CPU::step() {
             uint8_t reg = memory.read(pc++);
             registers[reg] = memory.read(sp);
             sp++; // Move pointer back up
+            break;
+        }
+        case OP_LOCK: {
+            uint8_t mutex_id = memory.read(pc++);
+            if (os != nullptr) {
+                if (!os->lock_mutex(mutex_id)) {
+                    // Failed to get lock. Thread is BLOCKED. 
+                    // Force a hardware context switch immediately!
+                    timer_interrupt_flag = true;
+                }
+            }
+            break;
+        }
+        case OP_UNLOCK: {
+            uint8_t mutex_id = memory.read(pc++);
+            if (os != nullptr) {
+                os->unlock_mutex(mutex_id);
+            }
             break;
         }
         default: {

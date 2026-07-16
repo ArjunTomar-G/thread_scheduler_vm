@@ -19,7 +19,7 @@ int main() {
     Memory memory(20000);       
     CPU cpu(memory);     
     Scheduler scheduler; 
-
+    cpu.attach_os(&scheduler);
     // 2 & 3. Dynamically Generate, Patch, and Load 15 Threads
     const int NUM_THREADS = 15;
     

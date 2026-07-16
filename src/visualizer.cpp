@@ -21,7 +21,7 @@ void Visualizer::update(const CPU& cpu, Scheduler& scheduler) {
 
     // CPU State
     mvprintw(2, 2, "--- CPU STATE ---");
-    mvprintw(3, 2, "Program Counter (PC): 0x%04X", cpu.get_pc());
+    mvprintw(3, 2, "Program Counter (PC): 0x%04zX", cpu.get_pc());
     
     uint32_t regs[4];
     cpu.get_registers(regs);

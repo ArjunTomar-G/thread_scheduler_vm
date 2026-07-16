@@ -2,7 +2,7 @@
 #include "memory.h"
 #include <array>
 #include <cstdint>
-
+class Scheduler;
 constexpr uint8_t OP_LOAD  = 0x01;
 constexpr uint8_t OP_ADD   = 0x02;
 constexpr uint8_t OP_PRINT = 0x03;
@@ -11,16 +11,16 @@ constexpr uint8_t OP_JNZ   = 0x05;
 constexpr uint8_t OP_PUSH  = 0x06; 
 constexpr uint8_t OP_POP   = 0x07; 
 constexpr uint8_t OP_HALT  = 0xFF;
-
+constexpr uint8_t OP_LOCK   = 0x08; 
+constexpr uint8_t OP_UNLOCK = 0x09;
 
 class CPU {
 private:
     Memory& memory;
     std::array<int, 4> registers; // 4 general-purpose registers: R0, R1, R2, R3
     size_t pc;                    // Program Counter (tracks current memory address)
-
     size_t sp;
-
+    Scheduler* os = nullptr;
     bool is_running;              // Is the CPU currently executing?
 
     // Hardware Timer & Interrupt State 
@@ -49,5 +49,6 @@ public:
     
     void set_registers(const uint32_t* regs);
     void get_registers(uint32_t* regs) const;
+    void attach_os(Scheduler* scheduler_ptr) { os = scheduler_ptr; }
 };
 

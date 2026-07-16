@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 
 // STATES :
 enum class ThreadState {
@@ -14,9 +15,9 @@ enum class ThreadState {
 
 // CPU Context
 struct VM_Context {
-    uint32_t instruction_pointer; // Where in the program the thread paused
-    uint32_t stack_pointer;       // Where the thread's stack is
-    uint32_t registers[4];        // general-purpose registers (R0, R1, R2, R3)
+    uint32_t instruction_pointer; 
+    uint32_t stack_pointer;       
+    uint32_t registers[4];        
 };
 
 // TCB
@@ -24,27 +25,45 @@ struct TCB {
     int thread_id;
     ThreadState state;
     VM_Context context;
-    
     int total_execution_time; 
+    
+    // NEW: MLFQ Tracking
+    int priority_level; // 0 = High, 1 = Medium, 2 = Low
+};
+
+// NEW: Mutex Resource Block
+struct Mutex {
+    bool is_locked = false;
+    int owner_thread_id = -1;
+    std::queue<TCB*> wait_queue; // Threads blocked waiting for this lock
 };
 
 class Scheduler {
 private:
-    std::queue<TCB*> ready_queue;
+    // NEW: Multi-Level Feedback Queue (Replaces ready_queue)
+    static const int NUM_PRIORITIES = 3;
+    std::vector<std::queue<TCB*>> mlfq;
+    
     std::vector<std::unique_ptr<TCB>> all_threads;
     TCB* current_thread;
     int next_thread_id;
+
+    // NEW: Mutex Registry & Cycle Tracking
+    std::unordered_map<int, Mutex> mutexes;
+    int cycle_counter;
 
 public:
     Scheduler();
     ~Scheduler() = default;
     
-    // Creates a new thread and puts it in the ready queue
     int create_thread(uint32_t start_address);
-
-    // Moves the current thread back to the queue and gets the next one
     TCB* schedule_next();
-
-    // Returns a pointer to whoever is currently running
     TCB* get_current_thread();
+
+    // NEW: Mutex API
+    bool lock_mutex(int mutex_id);
+    void unlock_mutex(int mutex_id);
+
+    // NEW: Starvation Prevention
+    void boost_priorities();
 };
