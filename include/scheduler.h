@@ -2,6 +2,7 @@
 #include <queue>
 #include <vector>
 #include <cstdint>
+#include <memory>
 
 // STATES :
 enum class ThreadState {
@@ -30,14 +31,14 @@ struct TCB {
 class Scheduler {
 private:
     std::queue<TCB*> ready_queue;
-    std::vector<TCB*> all_threads; // Keeps track of all created memory so we can clean it up
+    std::vector<std::unique_ptr<TCB>> all_threads;
     TCB* current_thread;
     int next_thread_id;
 
 public:
     Scheduler();
-    ~Scheduler();
-
+    ~Scheduler() = default;
+    
     // Creates a new thread and puts it in the ready queue
     int create_thread(uint32_t start_address);
 

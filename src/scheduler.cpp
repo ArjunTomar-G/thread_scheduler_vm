@@ -6,16 +6,9 @@ Scheduler::Scheduler() {
     next_thread_id = 1;
 }
 
-Scheduler::~Scheduler() {
-    // Clean up memory when the VM shuts down
-    for (TCB* thread : all_threads) {
-        delete thread;
-    }
-}
-
 int Scheduler::create_thread(uint32_t start_address) {
-    // Allocate a new TCB on the heap
-    TCB* new_thread = new TCB();
+    // Allocate on the heap using std::make_unique
+    auto new_thread = std::make_unique<TCB>();
     
     // Initialize 
     new_thread->thread_id = next_thread_id++;
@@ -28,12 +21,17 @@ int Scheduler::create_thread(uint32_t start_address) {
     for (int i = 0; i < 4; i++) {
         new_thread->context.registers[i] = 0;
     }
-    all_threads.push_back(new_thread);
-    ready_queue.push(new_thread);
+
+    TCB* thread_ptr = new_thread.get();
+
+    // Transfer ownership of the memory into the all_threads vector
+    all_threads.push_back(std::move(new_thread));
     
-    std::cout << "[Scheduler] Created Thread ID " << new_thread->thread_id << " starting at address " << start_address << "\n";
+    ready_queue.push(thread_ptr);
     
-    return new_thread->thread_id;
+    std::cout << "[Scheduler] Created Thread ID " << thread_ptr->thread_id << " starting at address " << start_address << "\n";
+    
+    return thread_ptr->thread_id;
 }
 
 TCB* Scheduler::schedule_next() {

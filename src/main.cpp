@@ -65,7 +65,7 @@ int main() {
     };
 
     // Execution configuration
-    const int TIME_QUANTUM = 8; 
+    cpu.set_time_quantum(8); 
     bool vm_running = true;
 
     while (vm_running) {
@@ -73,7 +73,17 @@ int main() {
 
         // PROFILE: Context Switch (Load)
         long long switch_start = get_time_us();
+        
         cpu.set_pc(current_thread->context.instruction_pointer);
+        
+        // --- NEW: Load the Stack Pointer safely ---
+        if (current_thread->context.stack_pointer == 0) {
+            // Allocate a unique 1KB stack frame based on thread_id
+            cpu.set_sp(19999 - (current_thread->thread_id * 1000));
+        } else {
+            cpu.set_sp(current_thread->context.stack_pointer);
+        }
+
         cpu.set_registers(current_thread->context.registers);
         long long switch_end = get_time_us();
         log_event("Context Switch (Load)", switch_start, switch_end, 0); 
@@ -81,17 +91,22 @@ int main() {
         // PROFILE: Thread Execution
         long long exec_start = get_time_us();
         
-        for (int step = 0; step < TIME_QUANTUM; step++) {
-            cpu.step();
+        // The CPU runs until IT throws a hardware interrupt!
+        while (!cpu.has_interrupt() && cpu.running()) {
+            cpu.tick(); // Advance the CPU clock
             viz.update(cpu, scheduler); 
             
-            // Note: No usleep() here so we generate a massive, true-speed trace!
-
-            if (!cpu.running()) { 
-                vm_running = false; 
-                break; 
-            }
             current_thread->total_execution_time++;
+        }
+        
+        // OS explicitly acknowledges and clears the hardware interrupt
+        if (cpu.has_interrupt()) {
+            cpu.clear_interrupt();
+        }
+
+        if (!cpu.running()) { 
+            vm_running = false; 
+            break; 
         }
         
         long long exec_end = get_time_us();
@@ -99,8 +114,12 @@ int main() {
 
         // PROFILE: Context Switch (Save & Yield)
         long long save_start = get_time_us();
+        
         current_thread->context.instruction_pointer = cpu.get_pc();
+        // --- NEW: Save the Stack Pointer back to the TCB ---
+        current_thread->context.stack_pointer = cpu.get_sp();
         cpu.get_registers(current_thread->context.registers);
+        
         current_thread = scheduler.schedule_next();
         long long save_end = get_time_us();
         log_event("Context Switch (Save/Yield)", save_start, save_end, 0);
